@@ -4,44 +4,126 @@ using UnityEngine;
 
 public class PlayerMovement : MonoBehaviour
 {
-    public Rigidbody2D rb;
-    private Vector2 movement;
-    public float moveSpeed = 5f;
-    private bool dashPressed;
-    private bool isDashing;
-    public float dashSpeed = 100f;
+    private enum State {
+        IDLE, // make idle state which plays idle animation
+        WALK, // make walk state animation play on walk state
+        ROLL // make role animation
+    }
 
-    void Update() {
-        movement.x = Input.GetAxisRaw("Horizontal");
-        movement.y = Input.GetAxisRaw("Vertical");
-        dashPressed = Input.GetKeyDown(KeyCode.Space);
-        Dash();
+    public Rigidbody2D rb;
+    public Animator animator;
+    private Vector3 moveDir;
+    private Vector3 rollDir;
+    private Vector3 lastMoveDir;
+    public float moveSpeed = 10f;
+    public float dashAmount = 10f;
+    private float rollSpeed;
+    private bool isDashing;
+    private State state;
+
+    float moveX = 0f;
+    float moveY = 0f;
+
+    private void Awake() {
+        rb = GetComponent<Rigidbody2D>();
+        state = State.WALK;
+    }
+
+    private void Update() {
+        switch (state) {
+            case State.WALK:
+                MoveInputHandler();
+                Dash();
+                OnRollPress();
+                break;
+            case State.ROLL:
+                Roll();
+                break;
+        }
     }
 
     private void FixedUpdate() {
-        Move();
+        FUState();
     }
 
-    private void Move() {
-        if (!isDashing) {
-            rb.MovePosition(rb.position + movement.normalized * moveSpeed * Time.deltaTime);
+    void MoveInputHandler() {
+
+        if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) {
+            moveY = +1f;
+        }
+        if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) {
+            moveY = -1f;
+        }
+        if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) {
+            moveX = -1f;
+        }
+        if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) {
+            moveX = +1f;
+        }
+
+        //resets movement
+        if (Input.GetKeyUp(KeyCode.W) || Input.GetKeyUp(KeyCode.UpArrow) || Input.GetKeyUp(KeyCode.S) || Input.GetKeyUp(KeyCode.DownArrow)) {
+            moveY = 0f;
+        }
+        if (Input.GetKeyUp(KeyCode.A) || Input.GetKeyUp(KeyCode.LeftArrow) || Input.GetKeyUp(KeyCode.D) || Input.GetKeyUp(KeyCode.RightArrow)) {
+            moveX = 0f;
+        }
+
+        // Disables diagonal movement
+        /*if (Mathf.Abs(moveX) > Mathf.Abs(moveY)) {
+            moveY = 0f;
+        } else { moveX = 0f; }*/
+
+        moveDir = new Vector3(moveX, moveY).normalized;
+        LastDirection();
+    }
+
+    void LastDirection() {
+        if (moveX != 0 || moveY != 0) {
+            lastMoveDir = moveDir;
+            animator.SetFloat("MoveX", moveDir.x);
+            animator.SetFloat("MoveY", moveDir.y);
         }
     }
 
-    private void Dash() {
-        if (dashPressed) {
+    void Dash() {
+        if (Input.GetKeyDown(KeyCode.F)) {
             isDashing = true;
-            rb.MovePosition(rb.position + movement * dashSpeed * Time.deltaTime);
-            StartDashTimer();
         }
     }
 
-    void StartDashTimer() {
-        StartCoroutine(DashTimer());
+    void OnRollPress() {
+        if (Input.GetKeyDown(KeyCode.Space)) {
+            rollDir = lastMoveDir;
+            rollSpeed = 50f;
+            state = State.ROLL;
+        }
     }
 
-    IEnumerator DashTimer() {
-        yield return new WaitForSeconds(0.3f);
-        isDashing = false;
+    void Roll() {
+        float rollSpeedDropMultiplier = 5;
+        rollSpeed -= rollSpeed * rollSpeedDropMultiplier * Time.deltaTime;
+
+        float rollSpeedMinimum = 10f;
+        if (rollSpeed < rollSpeedMinimum) {
+            state = State.WALK;
+        }
+    }
+
+
+    void FUState() {
+        switch (state) {
+            case State.WALK:
+                rb.velocity = moveDir * moveSpeed;
+
+                if (isDashing) {
+                    rb.MovePosition(transform.position + lastMoveDir * dashAmount);
+                    isDashing = false;
+                }
+                break;
+            case State.ROLL:
+                rb.velocity = rollDir * rollSpeed;
+                break;
+        }
     }
 }
