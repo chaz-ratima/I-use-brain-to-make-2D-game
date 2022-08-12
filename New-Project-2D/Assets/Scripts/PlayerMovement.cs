@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class PlayerMovement : MonoBehaviour
 {
-    private enum State {
+    private enum PlayerState {
         IDLE, // make idle state which plays idle animation
         WALK, // make walk state animation play on walk state
         ROLL // make role animation
@@ -15,28 +15,50 @@ public class PlayerMovement : MonoBehaviour
     private Vector3 moveDir;
     private Vector3 rollDir;
     private Vector3 lastMoveDir;
-    public float moveSpeed = 10f;
-    public float dashAmount = 10f;
+    public float moveSpeed = 5f;
+    public float dashAmount = 2f;
     private float rollSpeed;
-    private bool isDashing;
-    private State state;
+    public bool isDashing;
+    public bool canMove;
+    private PlayerState currentState;
 
     float moveX = 0f;
     float moveY = 0f;
 
     private void Awake() {
         rb = GetComponent<Rigidbody2D>();
-        state = State.WALK;
+        currentState = PlayerState.IDLE;
+    }
+
+    void Start() {
+        animator = GetComponent<Animator>();
     }
 
     private void Update() {
-        switch (state) {
-            case State.WALK:
-                MoveInputHandler();
-                Dash();
-                OnRollPress();
+
+        //resets movement
+        if (Input.GetKeyUp(KeyCode.W) || Input.GetKeyUp(KeyCode.UpArrow) || Input.GetKeyUp(KeyCode.S) || Input.GetKeyUp(KeyCode.DownArrow)) {
+            moveY = 0f;
+        }
+        if (Input.GetKeyUp(KeyCode.A) || Input.GetKeyUp(KeyCode.LeftArrow) || Input.GetKeyUp(KeyCode.D) || Input.GetKeyUp(KeyCode.RightArrow)) {
+            moveX = 0f;
+        }
+
+        MoveInputHandler();
+        Dash();
+        OnRollPress();
+
+        switch (currentState) {
+            case PlayerState.IDLE:
+                animator.Play("PlayerIdle");
+                canMove = true;
                 break;
-            case State.ROLL:
+            case PlayerState.WALK:
+                animator.Play("PlayerWalk");
+                canMove = true;
+                break;
+            case PlayerState.ROLL:
+                canMove = false;
                 Roll();
                 break;
         }
@@ -61,14 +83,6 @@ public class PlayerMovement : MonoBehaviour
             moveX = +1f;
         }
 
-        //resets movement
-        if (Input.GetKeyUp(KeyCode.W) || Input.GetKeyUp(KeyCode.UpArrow) || Input.GetKeyUp(KeyCode.S) || Input.GetKeyUp(KeyCode.DownArrow)) {
-            moveY = 0f;
-        }
-        if (Input.GetKeyUp(KeyCode.A) || Input.GetKeyUp(KeyCode.LeftArrow) || Input.GetKeyUp(KeyCode.D) || Input.GetKeyUp(KeyCode.RightArrow)) {
-            moveX = 0f;
-        }
-
         // Disables diagonal movement
         /*if (Mathf.Abs(moveX) > Mathf.Abs(moveY)) {
             moveY = 0f;
@@ -79,10 +93,13 @@ public class PlayerMovement : MonoBehaviour
     }
 
     void LastDirection() {
-        if (moveX != 0 || moveY != 0) {
-            lastMoveDir = moveDir;
-            animator.SetFloat("MoveX", moveDir.x);
-            animator.SetFloat("MoveY", moveDir.y);
+        if (canMove) {
+            if (moveX != 0 || moveY != 0) {
+                currentState = PlayerState.WALK;
+                lastMoveDir = moveDir;
+                animator.SetFloat("MoveX", moveDir.x);
+                animator.SetFloat("MoveY", moveDir.y);
+            } else { currentState = PlayerState.IDLE; }
         }
     }
 
@@ -95,25 +112,35 @@ public class PlayerMovement : MonoBehaviour
     void OnRollPress() {
         if (Input.GetKeyDown(KeyCode.Space)) {
             rollDir = lastMoveDir;
-            rollSpeed = 50f;
-            state = State.ROLL;
+            rollSpeed = 30f;
+            currentState = PlayerState.ROLL;
         }
     }
 
     void Roll() {
+        // Gets rollspeed and drops by multiplier until it hits the minimum then enters new state.
         float rollSpeedDropMultiplier = 5;
         rollSpeed -= rollSpeed * rollSpeedDropMultiplier * Time.deltaTime;
 
-        float rollSpeedMinimum = 10f;
+        //animator.Play("PlayerRoll");
+        float rollSpeedMinimum = 5f;
         if (rollSpeed < rollSpeedMinimum) {
-            state = State.WALK;
+            canMove = true;
+            if (moveX != 0 || moveY != 0) {
+                currentState = PlayerState.WALK;
+            }
+            else { currentState = PlayerState.IDLE; }
         }
     }
 
 
     void FUState() {
-        switch (state) {
-            case State.WALK:
+        // Change of speeds in each states
+        switch (currentState) {
+            case PlayerState.IDLE:
+                rb.velocity = new Vector2(0 , 0);
+                break;
+            case PlayerState.WALK:
                 rb.velocity = moveDir * moveSpeed;
 
                 if (isDashing) {
@@ -121,7 +148,7 @@ public class PlayerMovement : MonoBehaviour
                     isDashing = false;
                 }
                 break;
-            case State.ROLL:
+            case PlayerState.ROLL:
                 rb.velocity = rollDir * rollSpeed;
                 break;
         }
