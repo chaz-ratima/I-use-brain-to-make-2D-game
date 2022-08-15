@@ -4,6 +4,11 @@ using UnityEngine;
 
 public class PlayerMovement : MonoBehaviour
 {
+
+    // -------- to do ------- //
+    // Add DODGE state since dodge is only called when in WALK state and can't be used when in IDLE state
+    //
+
     private enum PlayerState {
         IDLE, // make idle state which plays idle animation
         WALK, // make walk state animation play on walk state
